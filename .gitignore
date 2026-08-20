@@ -1,0 +1,9 @@
+# API 키
+.env
+
+# 빌드 결과물
+*.exe
+
+# IDE 설정
+.vscode/
+.idea/
