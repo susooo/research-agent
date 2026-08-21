@@ -57,9 +57,9 @@ func main() {
 		fmt.Println(colorRed+"❌ output 폴더 생성 실패:"+colorReset, err)
 		os.Exit(1)
 	}
-
+	safeTitle := strings.ReplaceAll(topic, " ", "-")
 	timestamp := time.Now().Format("20060102_150405")
-	reportPath := fmt.Sprintf("output/report_%s_%s.md", topic, timestamp)
+	reportPath := fmt.Sprintf("output/report_%s_%s.md", safeTitle, timestamp)
 
 	if err := os.WriteFile(reportPath, []byte(report.Markdown), 0644); err != nil {
 		fmt.Println(colorRed+"❌ 리포트 저장 실패:"+colorReset, err)
@@ -94,7 +94,7 @@ func main() {
 	fmt.Println()
 	fmt.Println(colorYellow + "🎨 카드뉴스 생성 중..." + colorReset)
 
-	cardPath := fmt.Sprintf("output/cards_%s_%s.html", topic, timestamp)
+	cardPath := fmt.Sprintf("output/cards_%s_%s.html", safeTitle, timestamp)
 	if err := renderer.GenerateCardNews(report, cardPath, cfg); err != nil {
 		fmt.Println(colorRed+"❌ 카드뉴스 생성 실패:"+colorReset, err)
 		os.Exit(1)
@@ -103,6 +103,15 @@ func main() {
 	fmt.Println()
 	fmt.Println(colorGreen + colorBold + "✅ 카드뉴스 생성 완료!" + colorReset)
 	fmt.Println("🃏 저장 위치: " + cardPath)
+
+	// index.html 업데이트
+	cardFilename := fmt.Sprintf("cards_%s_%s.html", safeTitle, timestamp)
+	if err := renderer.UpdateIndex(topic, cardFilename); err != nil {
+		fmt.Println(colorYellow+"⚠ README.md 업데이트 실패:"+colorReset, err)
+	} else {
+		fmt.Println(colorGreen + "📋 output/README.md 업데이트 완료!" + colorReset)
+	}
+
 	fmt.Println()
 	fmt.Println(colorCyan + "💡 브라우저에서 열어서 확인하세요!" + colorReset)
 }
