@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"research-agent/agent"
+	"research-agent/models"
 	"research-agent/config"
 )
 
 // GenerateCardNews — HTML 카드뉴스 파일 생성
-func GenerateCardNews(report *agent.Report, outputPath string, cfg *config.Config) error {
+func GenerateCardNews(report *models.Report, outputPath string, cfg *config.Config) error {
 	if len(report.Cards) == 0 {
 		return fmt.Errorf("카드 데이터가 없습니다")
 	}
@@ -22,7 +22,7 @@ func GenerateCardNews(report *agent.Report, outputPath string, cfg *config.Confi
 }
 
 // buildHTML — 전체 HTML 조립
-func buildHTML(report *agent.Report) string {
+func buildHTML(report *models.Report) string {
 	now := time.Now().Format("2006년 01월 02일")
 
 	return fmt.Sprintf(`<!DOCTYPE html>
@@ -286,7 +286,7 @@ func buildHTML(report *agent.Report) string {
 }
 
 // buildCards — 카드 HTML 생성
-func buildCards(cards []agent.CardContent) string {
+func buildCards(cards []models.CardContent) string {
 	var sb strings.Builder
 	total := len(cards)
 

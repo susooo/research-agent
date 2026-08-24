@@ -31,7 +31,12 @@ func main() {
 
 	printBanner()
 
-	// ── Step 1: 주제 입력 ──
+	// ── Step 1: 모드 선택 ──
+	fmt.Print(colorCyan + "\n모드 선택 [1: 리서치  2: 벤치마크]: " + colorReset)
+	scanner.Scan()
+	mode := strings.TrimSpace(scanner.Text())
+
+	// ── Step 2: 주제 입력 ──
 	fmt.Print(colorCyan + "\n🔍 리서치할 주제를 입력하세요: " + colorReset)
 	scanner.Scan()
 	topic := strings.TrimSpace(scanner.Text())
@@ -39,20 +44,30 @@ func main() {
 		fmt.Println(colorRed + "❌ 주제를 입력해주세요." + colorReset)
 		os.Exit(1)
 	}
+	
+	a := agent.New(cfg)
 
-	// ── Step 2: 리서치 실행 ──
+	// *벤치마크 모드
+	if mode == "2" {
+		if err := a.BenchmarkParallel(topic); err != nil {
+			fmt.Println(colorRed+"❌ 벤치마크 실패:"+colorReset, err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// ── Step 3: 리서치 실행 ──
 	fmt.Println()
 	fmt.Println(colorYellow + "⚡ 병렬 웹 리서치 시작..." + colorReset)
 	fmt.Println(strings.Repeat("─", 50))
 
-	a := agent.New(cfg)
 	report, err := a.Research(topic)
 	if err != nil {
 		fmt.Println(colorRed+"❌ 리서치 실패:"+colorReset, err)
 		os.Exit(1)
 	}
 
-	// ── Step 3: 리포트 저장 ──
+	// ── Step 4: 리포트 저장 ──
 	if err := os.MkdirAll("output", 0755); err != nil {
 		fmt.Println(colorRed+"❌ output 폴더 생성 실패:"+colorReset, err)
 		os.Exit(1)
@@ -71,13 +86,13 @@ func main() {
 	fmt.Println("📄 저장 위치: " + reportPath)
 	fmt.Println(strings.Repeat("─", 50))
 
-	// ── Step 4: 리포트 미리보기 ──
+	// ── Step 5: 리포트 미리보기 ──
 	fmt.Println(colorBold + "\n📋 리포트 미리보기:" + colorReset)
 	fmt.Println()
 	printPreview(report.Markdown)
 	fmt.Println(strings.Repeat("─", 50))
 
-	// ── Step 5: Human-in-the-loop (승인 게이트) ──
+	// ── Step 6: Human-in-the-loop (승인 게이트) ──
 	fmt.Println()
 	fmt.Print(colorYellow + colorBold + "🤔 카드뉴스를 생성할까요? [y/n]: " + colorReset)
 	scanner.Scan()
@@ -90,7 +105,7 @@ func main() {
 		return
 	}
 
-	// ── Step 6: 카드뉴스 생성 ──
+	// ── Step 7: 카드뉴스 생성 ──
 	fmt.Println()
 	fmt.Println(colorYellow + "🎨 카드뉴스 생성 중..." + colorReset)
 

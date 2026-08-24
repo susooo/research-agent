@@ -11,26 +11,11 @@ import (
 	"time"
 
 	"research-agent/config"
+	"research-agent/models"
 	"research-agent/orchestrator"
+	"research-agent/renderer"
 	"research-agent/tools"
 )
-
-// Report — 최종 결과물
-type Report struct {
-	Topic    string
-	Markdown string
-	Cards    []CardContent
-	Sources  []string
-}
-
-// CardContent — 카드뉴스 한장
-type CardContent struct {
-	CardNumber int
-	Headline   string
-	Body       string
-	Emoji      string
-	Tag        string
-}
 
 // Agent — 전체 흐름 지휘자
 type Agent struct {
@@ -73,7 +58,7 @@ func New(cfg *config.Config) *Agent {
 }
 
 // Research — 전체 리서치 흐름
-func (a *Agent) Research(topic string) (*Report, error) {
+func (a *Agent) Research(topic string) (*models.Report, error) {
 	ctx := context.Background()
 
 	// 1단계: 검색 쿼리 생성
@@ -118,12 +103,90 @@ func (a *Agent) Research(topic string) (*Report, error) {
 		}
 	}
 
-	return &Report{
+	return &models.Report{
 		Topic:    topic,
 		Markdown: markdown,
 		Cards:    cards,
 		Sources:  sources,
 	}, nil
+}
+
+// BenchmarkParallel — 병렬 vs 순차 실행 시간 비교
+func (a *Agent) BenchmarkParallel(topic string) error {
+	ctx := context.Background()
+
+	fmt.Println("\n📊 병렬 vs 순차 벤치마크 시작")
+	fmt.Println(strings.Repeat("─", 50))
+
+	// 1. 동일한 쿼리 생성
+	fmt.Println("\n쿼리 생성 중...")
+	queries, err := a.generateQueries(ctx, topic)
+	if err != nil {
+		return fmt.Errorf("쿼리 생성 실패: %w", err)
+	}
+
+	fmt.Printf("쿼리 %d개 생성 완료\n", len(queries))
+	for i, q := range queries {
+		fmt.Printf("    %d. %s\n", i+1, q)
+	}
+	fmt.Println()
+
+	// 2. 순차 실행
+	fmt.Println("\n[1/2] 순차 실행 중...")
+
+	seqStart := time.Now()
+	_, err = a.orch.RunSequential(ctx, queries)
+	seqTime := time.Since(seqStart)
+	if err != nil {
+		return fmt.Errorf("순차 실행 실패: %w", err)
+	}
+	fmt.Printf("완료: %dms\n", seqTime.Milliseconds())
+
+	// 3. 병렬 실행
+	fmt.Println("\n[2/2] 병렬 실행 중...")
+
+	parStart := time.Now()
+	_, err = a.orch.RunParallel(ctx, queries)
+	parTime := time.Since(parStart)
+	if err != nil {
+		return fmt.Errorf("병렬 실행 실패: %w", err)
+	}
+	fmt.Printf("완료: %dms\n", parTime.Milliseconds())
+
+	// ── 결과 출력 ──
+	improvement := float64(seqTime) / float64(parTime)
+	reduction := (1 - float64(parTime)/float64(seqTime)) * 100
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("─", 50))
+	fmt.Println("📊 결과")
+	fmt.Println(strings.Repeat("─", 50))
+	fmt.Printf("  순차 실행: %dms\n", seqTime.Milliseconds())
+	fmt.Printf("  병렬 실행: %dms\n", parTime.Milliseconds())
+	fmt.Printf("  개선율:    %.1f배 빠름\n", improvement)
+	fmt.Printf("  시간 단축: %.0f%%\n", reduction)
+	fmt.Println(strings.Repeat("─", 50))
+
+	// ── 파일 저장 ──
+	fmt.Println()
+
+	err = renderer.SaveBenchmark(models.BenchmarkResult{
+		Topic:       topic,
+		SeqTime:     seqTime.Milliseconds(),
+		ParTime:     parTime.Milliseconds(),
+		Workers:     a.cfg.MaxWorkers,
+		Improvement: improvement,
+		Reduction:   reduction,
+		RunAt:       time.Now().Format("2006-01-02 15:04:05"),
+	})
+	if err != nil {
+		return fmt.Errorf("벤치마크 저장 실패: %w", err)
+	}
+
+	fmt.Println("✅ benchmark.md 저장 완료!")
+	fmt.Println("📄 저장 위치: output/benchmark.md")
+
+	return nil
 }
 
 // generateQueries — Gemini로 검색 쿼리 생성
@@ -190,7 +253,7 @@ func (a *Agent) generateReport(ctx context.Context, topic string, results []tool
 }
 
 // extractCards — 리포트에서 카드뉴스 데이터 추출
-func (a *Agent) extractCards(ctx context.Context, markdown string) ([]CardContent, error) {
+func (a *Agent) extractCards(ctx context.Context, markdown string) ([]models.CardContent, error) {
 	prompt := fmt.Sprintf(`다음 리포트에서 카드뉴스 6장을 만들 데이터를 추출해주세요.
 
 리포트:
@@ -236,9 +299,9 @@ func (a *Agent) extractCards(ctx context.Context, markdown string) ([]CardConten
 		return nil, fmt.Errorf("카드 JSON 파싱 실패: %w", err)
 	}
 
-	var cards []CardContent
+	var cards []models.CardContent
 	for _, r := range raw {
-		cards = append(cards, CardContent{
+		cards = append(cards, models.CardContent{
 			CardNumber: r.CardNumber,
 			Headline:   r.Headline,
 			Body:       r.Body,

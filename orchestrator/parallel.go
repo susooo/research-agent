@@ -119,3 +119,26 @@ func (o *Orchestrator) RunParallel(ctx context.Context, queries []string) ([]too
 
 	return allResults, nil
 }
+
+// RunSequential — 순차 실행 (벤치마크 비교용)
+func (o *Orchestrator) RunSequential(ctx context.Context, queries []string) ([]tools.SearchResult, error) {
+	var allResults []tools.SearchResult
+
+	for _, query := range queries {
+		start := time.Now()
+		results, err := o.searcher.Search(query)
+		elapsed := time.Since(start)
+
+		if err != nil {
+			fmt.Printf(colorRed+"  ✗ [%dms] %s → 실패"+colorReset+"\n",
+				elapsed.Milliseconds(), query)
+			continue
+		}
+		fmt.Printf(colorGreen+"  ✓ [%dms] %s → %d개 결과"+colorReset+"\n",
+			elapsed.Milliseconds(), query, len(results))
+
+		allResults = append(allResults, results...)
+	}
+
+	return allResults, nil
+}
