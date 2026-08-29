@@ -27,3 +27,18 @@ type BenchmarkResult struct {
 	Reduction   float64
 	RunAt       string
 }
+
+// TradeoffResult — 워커 하나의 트레이드오프 측정 결과
+type TradeoffResult struct {
+	Workers       int
+	ElapsedMs     int64
+	MemoryMB  	  float64
+	Failed        bool
+}
+
+// TradeoffBenchmarkResult — 트레이드오프 벤치마크 결과
+type TradeoffBenchmarkResult struct {
+	Topic   string
+	RunAt   string
+	Results []TradeoffResult
+}

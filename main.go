@@ -32,7 +32,7 @@ func main() {
 	printBanner()
 
 	// ── Step 1: 모드 선택 ──
-	fmt.Print(colorCyan + "\n모드 선택 [1: 리서치  2: 벤치마크]: " + colorReset)
+	fmt.Print(colorCyan + "\n모드 선택 [1: 리서치  2: 벤치마크  3: 트레이드오프]: " + colorReset)
 	scanner.Scan()
 	mode := strings.TrimSpace(scanner.Text())
 
@@ -51,6 +51,15 @@ func main() {
 	if mode == "2" {
 		if err := a.BenchmarkParallel(topic); err != nil {
 			fmt.Println(colorRed+"❌ 벤치마크 실패:"+colorReset, err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// *트레이드오프 모드
+	if mode == "3" {
+		if err := a.BenchmarkWorkers(topic); err != nil {
+			fmt.Println(colorRed+"❌ 트레이드오프 비교 실패:"+colorReset, err)
 			os.Exit(1)
 		}
 		return

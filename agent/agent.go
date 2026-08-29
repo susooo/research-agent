@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"runtime"
 
 	"research-agent/config"
 	"research-agent/models"
@@ -184,6 +185,178 @@ func (a *Agent) BenchmarkParallel(topic string) error {
 	}
 
 	fmt.Println("✅ benchmark.md 저장 완료!")
+	fmt.Println("📄 저장 위치: output/benchmark.md")
+
+	return nil
+}
+
+// BenchmarkWorkers — 워커 수별 성능 비교 (1, 2, 3, 4, 6)
+func (a *Agent) BenchmarkWorkers(topic string) error {
+	ctx := context.Background()
+
+	fmt.Println("\n⚡ 워커 수별 벤치마크 시작")
+	fmt.Println(strings.Repeat("─", 50))
+
+	// 쿼리 생성
+	fmt.Println("쿼리 생성 중...")
+	queries, err := a.generateQueries(ctx, topic)
+	if err != nil {
+		return fmt.Errorf("쿼리 생성 실패: %w", err)
+	}
+	fmt.Printf("쿼리 %d개 생성 완료\n\n", len(queries))
+	for i, q := range queries {
+		fmt.Printf("  %d. %s\n", i+1, q)
+	}
+	fmt.Println()
+
+	// ==============================
+	// 1. 순차 실행 (기준값)
+	// ==============================
+	fmt.Println("[기준] 순차 실행 중...")
+
+	runtime.GC()
+	var seqMemBefore runtime.MemStats
+	runtime.ReadMemStats(&seqMemBefore)
+
+	seqStart := time.Now()
+	_, seqErr := a.orch.RunSequential(ctx, queries)
+	seqTime := time.Since(seqStart)
+	
+	var seqMemAfter runtime.MemStats
+	runtime.ReadMemStats(&seqMemAfter)
+	seqMemMB := float64(seqMemAfter.TotalAlloc-seqMemBefore.TotalAlloc) / 1024 / 1024 //Byte를 MB로 변환
+
+	seqResult := models.TradeoffResult{
+		Workers:   1,
+		ElapsedMs: seqTime.Milliseconds(),
+		MemoryMB:  seqMemMB,
+		Failed:    seqErr != nil,
+	}
+
+	if seqErr != nil {
+		fmt.Printf("실패: %v\n", seqErr)
+
+		// 순차 실행 실패 결과 저장
+		err := renderer.SaveTradeoffBenchmark(
+			models.TradeoffBenchmarkResult{
+				Topic:   topic,
+				RunAt:   time.Now().Format("2006-01-02 15:04:05"),
+				Results: []models.TradeoffResult{
+					seqResult,
+				},
+			},
+		)
+
+		if err != nil {
+			return fmt.Errorf("벤치마크 저장 실패: %w", err)
+		}
+
+		return fmt.Errorf("순차 실행 실패: %w", seqErr)
+	}
+
+	// ==============================
+	// 2. Worker 수별 병렬 실행
+	// ==============================
+	workerCounts := []int{2, 3, 4, 6}
+	var tradeoffResults []models.TradeoffResult
+
+	for _, w := range workerCounts {
+		fmt.Printf("[워커 %d개] 병렬 실행 중...\n", w)
+
+		tempOrch := orchestrator.New(
+			tools.NewSearcher(a.cfg.TavilyAPIKey),
+			w,
+		)
+
+		runtime.GC()
+		var memBefore runtime.MemStats
+		runtime.ReadMemStats(&memBefore)
+
+		start := time.Now()
+		_, workerErr := tempOrch.RunParallel(ctx, queries)
+		elapsed := time.Since(start)
+		
+		var memAfter runtime.MemStats
+		runtime.ReadMemStats(&memAfter)
+		memMB := float64(memAfter.TotalAlloc-memBefore.TotalAlloc) / 1024 / 1024
+
+		result := models.TradeoffResult{
+			Workers:   w,
+			ElapsedMs: elapsed.Milliseconds(),
+			MemoryMB:  memMB,
+			Failed:    workerErr != nil,
+		}
+
+		tradeoffResults = append(
+			tradeoffResults,
+			result,
+		)
+
+		// 실패한 Worker는 기록만 하고 다음 Worker 진행
+		if workerErr != nil {
+			fmt.Printf("실패: %v\n\n", workerErr)
+			continue
+		}
+
+		improvement := float64(seqTime) / float64(elapsed)
+
+		fmt.Printf(
+			"완료: %dms (순차 대비 %.1f배)\n\n",
+			elapsed.Milliseconds(),
+			improvement,
+		)
+	}
+
+	// ==============================
+	// 3. 간단한 결과 출력
+	// ==============================
+	fmt.Println(strings.Repeat("─", 50))
+	fmt.Println("⚡ 워커 수별 결과")
+	fmt.Println(strings.Repeat("─", 50))
+	fmt.Printf("  %-12s %10dms  기준\n", "1 (순차)", seqResult.ElapsedMs)
+	for _, r := range tradeoffResults {
+		if r.Failed {
+			fmt.Printf(
+				"  %-12s %10dms  실패\n",
+				fmt.Sprintf("워커 %d개", r.Workers),
+				r.ElapsedMs,
+			)
+			continue
+		}
+
+		improvement := float64(seqResult.ElapsedMs) / float64(r.ElapsedMs)
+
+		fmt.Printf(
+			"  %-12s %10dms  %.1f배\n",
+			fmt.Sprintf("워커 %d개", r.Workers),
+			r.ElapsedMs,
+			improvement,
+		)
+	}
+	fmt.Println(strings.Repeat("─", 50))
+
+	// ==============================
+	// 4. 전체 결과 저장
+	// ==============================
+	allResults := []models.TradeoffResult{
+		seqResult,
+	}
+
+	allResults = append(allResults, tradeoffResults...)
+
+	err = renderer.SaveTradeoffBenchmark(
+		models.TradeoffBenchmarkResult{
+			Topic:   topic,
+			RunAt:   time.Now().Format("2006-01-02 15:04:05"),
+			Results: allResults,
+		},
+	)
+
+	if err != nil {
+		return fmt.Errorf("워커 벤치마크 저장 실패: %w", err)
+	}
+
+	fmt.Println("\n✅ benchmark.md 워커별 결과 저장 완료!")
 	fmt.Println("📄 저장 위치: output/benchmark.md")
 
 	return nil
