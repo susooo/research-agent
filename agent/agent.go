@@ -71,17 +71,54 @@ func (a *Agent) Research(topic string) (*models.Report, error) {
 
 	// 2단계: 병렬 웹 검색
 	fmt.Printf("\n[2/4] 병렬 웹 검색 중 (%d개 Goroutine)...\n", a.cfg.MaxWorkers)
-	start := time.Now()
+	//start := time.Now()
 	results, err := a.orch.RunParallel(ctx, queries)
 	if err != nil {
 		return nil, fmt.Errorf("웹 검색 실패: %w", err)
 	}
 
-	avgScore, maxScore, minScore := calcQualityStats(results)
-	fmt.Printf("  → 총 %d개 결과 수집 (%.1fs)\n", len(results), time.Since(start).Seconds())
+	// 2-1단계: 신뢰도 낮은 출처 차단
+	var filteredResults []tools.SearchResult
+	var blockedCount, lowScoreCount int
+
+	for _, r := range results {
+		// 차단 도메인 확인
+		if a.isBlockedDomain(r.URL) {
+			blockedCount++
+			continue
+		}
+		// Score 임계값 확인
+		if r.Score < a.cfg.MinScore {
+			lowScoreCount++
+			continue
+		}
+		filteredResults = append(filteredResults, r)
+	}
+
+	fmt.Printf("  → 전체 %d개 중 신뢰 결과 %d개 사용\n",
+		len(results), len(filteredResults))
+	fmt.Printf("    차단 도메인: %d개 / Score 미달(%.1f 미만): %d개\n",
+		blockedCount, a.cfg.MinScore, lowScoreCount)
+
+	// 결과 너무 적으면 Score 기준 완화 (차단 도메인은 유지)
+	if len(filteredResults) < 5 {
+		fmt.Println("  ⚠ 결과 부족 → Score 기준 0.5로 완화")
+		filteredResults = nil
+		for _, r := range results {
+			if a.isBlockedDomain(r.URL) {
+				continue
+			}
+			if r.Score >= 0.5 {
+				filteredResults = append(filteredResults, r)
+			}
+		}
+		fmt.Printf("  → 완화 후 %d개 사용\n", len(filteredResults))
+	}
+
+	// 2-2단계: 검색 품질 평가
+	avgScore, maxScore, minScore := calcQualityStats(filteredResults)
 	fmt.Printf("  → 검색 품질 점수: 평균 %.2f / 최고 %.2f / 최저 %.2f\n", avgScore, maxScore, minScore)
 
-	// 2-1단계: 검색 품질 평가
 	if err := renderer.SaveQuality(models.QualityResult{
 		Topic:    topic,
 		Version:  a.cfg.PromptVersion,
@@ -96,7 +133,7 @@ func (a *Agent) Research(topic string) (*models.Report, error) {
 
 	// 3단계: 리포트 작성
 	fmt.Println("\n[3/4] 리포트 작성 중...")
-	markdown, err := a.generateReport(ctx, topic, results)
+	markdown, err := a.generateReport(ctx, topic, filteredResults)
 	if err != nil {
 		return nil, fmt.Errorf("리포트 생성 실패: %w", err)
 	}
@@ -112,7 +149,7 @@ func (a *Agent) Research(topic string) (*models.Report, error) {
 	// 출처 URL 수집 (중복 제거)
 	var sources []string
 	seen := map[string]bool{}
-	for _, r := range results {
+	for _, r := range filteredResults {
 		if !seen[r.URL] {
 			sources = append(sources, r.URL)
 			seen[r.URL] = true
@@ -385,7 +422,6 @@ func (a *Agent) generateQueries(ctx context.Context, topic string) ([]string, er
 규칙:
 - 한 줄에 쿼리 하나씩
 - 번호나 기호 없이 쿼리 텍스트만
-- 주제를 그대로 반복하지 말고 구체적인 핵심 키워드를 포함
 - 각 쿼리는 서로 다른 검색 의도를 가져야 함
 - 동일하거나 의미가 유사한 쿼리는 생성하지 말 것
 - 영어/한국어 혼용 가능
@@ -593,4 +629,14 @@ func calcQualityStats(results []tools.SearchResult) (avg, max, min float64) {
 
 	avg = total / float64(len(results))
 	return
+}
+
+// isBlockedDomain — config 기반 차단 도메인 확인
+func (a *Agent) isBlockedDomain(url string) bool {
+    for _, domain := range a.cfg.BlockedDomains {
+        if strings.Contains(url, domain) {
+            return true
+        }
+    }
+    return false
 }

@@ -12,6 +12,8 @@ type Config struct {
 	MaxWorkers   int
 	PromptVersion string
 	PromptNote    string
+	BlockedDomains []string
+	MinScore       float64
 }
 
 func Load() *Config {
@@ -22,6 +24,15 @@ func Load() *Config {
 		MaxWorkers:   3,
 		PromptVersion: "v2",
 		PromptNote:    "검색 의도 다양화 및 중복 쿼리 제거",
+		MinScore:      0.7,
+		BlockedDomains: []string{
+            "blog.naver.com",
+			"tistory.com",
+			"velog.io",
+			"reddit.com",
+			"stackoverflow.com",
+            "medium.com",
+        },
 	}
 
 	if cfg.GeminiAPIKey == "" {

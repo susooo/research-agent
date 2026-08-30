@@ -9,6 +9,10 @@
 
 | 날짜 | 주제 | 링크 |
 | --- | --- | --- |
+| 2026-08-31 04:02 | Go언어 vs Rust 비교 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_Go언어-vs-Rust-비교_20260831_040223.html) |
+| 2026-08-31 03:56 | 온디바이스 AI와 Edge AI | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_온디바이스-AI와-Edge-AI_20260831_035644.html) |
+| 2026-08-31 03:35 | 온디바이스 AI와 Edge AI | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_온디바이스-AI와-Edge-AI_20260831_033516.html) |
+| 2026-08-31 02:22 | Go언어의 장단점 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_Go언어의-장단점_20260831_022202.html) |
 | 2026-08-31 00:23 | Agentic AI의 상용화 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_Agentic-AI의-상용화_20260831_002329.html) |
 | 2026-08-31 00:22 | 2026년 주목받는 AI 트렌드 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_2026년-주목받는-AI-트렌드_20260831_002238.html) |
 | 2026-08-30 23:53 | Agentic AI의 상용화 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_Agentic-AI의-상용화_20260830_235325.html) |
