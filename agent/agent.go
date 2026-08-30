@@ -61,18 +61,24 @@ func New(cfg *config.Config) *Agent {
 // Research — 전체 리서치 흐름
 func (a *Agent) Research(topic string) (*models.Report, error) {
 	ctx := context.Background()
+	totalStart := time.Now()
 
 	// 1단계: 검색 쿼리 생성
 	fmt.Println("\n[1/4] 검색 쿼리 생성 중...")
+	step1Start := time.Now()
 	queries, err := a.generateQueries(ctx, topic)
+	step1Time := time.Since(step1Start)
+
 	if err != nil {
 		return nil, fmt.Errorf("쿼리 생성 실패: %w", err)
 	}
 
 	// 2단계: 병렬 웹 검색
 	fmt.Printf("\n[2/4] 병렬 웹 검색 중 (%d개 Goroutine)...\n", a.cfg.MaxWorkers)
-	//start := time.Now()
+	step2Start := time.Now()
 	results, err := a.orch.RunParallel(ctx, queries)
+	step2Time := time.Since(step2Start)
+
 	if err != nil {
 		return nil, fmt.Errorf("웹 검색 실패: %w", err)
 	}
@@ -133,18 +139,43 @@ func (a *Agent) Research(topic string) (*models.Report, error) {
 
 	// 3단계: 리포트 작성
 	fmt.Println("\n[3/4] 리포트 작성 중...")
+	step3Start := time.Now()
 	markdown, err := a.generateReport(ctx, topic, filteredResults)
+	step3Time := time.Since(step3Start)
+
 	if err != nil {
 		return nil, fmt.Errorf("리포트 생성 실패: %w", err)
 	}
 
 	// 4단계: 카드뉴스 데이터 추출
 	fmt.Println("\n[4/4] 카드뉴스 데이터 추출 중...")
+	step4Start := time.Now()
 	cards, err := a.extractCards(ctx, markdown)
+	step4Time := time.Since(step4Start)
+
 	if err != nil {
 		// 카드 실패는 치명적이지 않음 — 리포트는 살림
 		fmt.Printf("  ⚠ 카드 추출 실패 (리포트는 정상): %v\n", err)
 	}
+
+	totalTime := time.Since(totalStart)
+	// Breakdown 출력
+	fmt.Println()
+	fmt.Println(strings.Repeat("─", 45))
+	fmt.Println("⏱ 소요 시간 Breakdown")
+	fmt.Println(strings.Repeat("─", 45))
+	fmt.Printf("  [1/4] 쿼리 생성:   %5.1fs  (Gemini API)\n",
+		step1Time.Seconds())
+	fmt.Printf("  [2/4] 병렬 검색:   %5.1fs  (Tavily × %d 병렬)\n",
+		step2Time.Seconds(), a.cfg.MaxWorkers)
+	fmt.Printf("  [3/4] 리포트 작성: %5.1fs  (Gemini API)\n",
+		step3Time.Seconds())
+	fmt.Printf("  [4/4] 카드 추출:   %5.1fs  (Gemini API)\n",
+		step4Time.Seconds())
+	fmt.Println(strings.Repeat("─", 45))
+	fmt.Printf("  총 소요 시간:      %5.1fs\n", totalTime.Seconds())
+	fmt.Printf("  검색 품질 점수:    %.2f / 1.0\n", avgScore)
+	fmt.Println(strings.Repeat("─", 45))
 
 	// 출처 URL 수집 (중복 제거)
 	var sources []string

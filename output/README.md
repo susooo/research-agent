@@ -9,6 +9,7 @@
 
 | 날짜 | 주제 | 링크 |
 | --- | --- | --- |
+| 2026-08-31 04:17 | RAG 기술의 발전과 최신 검색 증강 방식 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_RAG-기술의-발전과-최신-검색-증강-방식_20260831_041737.html) |
 | 2026-08-31 04:02 | Go언어 vs Rust 비교 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_Go언어-vs-Rust-비교_20260831_040223.html) |
 | 2026-08-31 03:56 | 온디바이스 AI와 Edge AI | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_온디바이스-AI와-Edge-AI_20260831_035644.html) |
 | 2026-08-31 03:35 | 온디바이스 AI와 Edge AI | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_온디바이스-AI와-Edge-AI_20260831_033516.html) |
