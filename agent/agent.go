@@ -76,8 +76,23 @@ func (a *Agent) Research(topic string) (*models.Report, error) {
 	if err != nil {
 		return nil, fmt.Errorf("웹 검색 실패: %w", err)
 	}
-	fmt.Printf("  → 총 %d개 결과 수집 (%.1fs)\n",
-		len(results), time.Since(start).Seconds())
+
+	avgScore, maxScore, minScore := calcQualityStats(results)
+	fmt.Printf("  → 총 %d개 결과 수집 (%.1fs)\n", len(results), time.Since(start).Seconds())
+	fmt.Printf("  → 검색 품질 점수: 평균 %.2f / 최고 %.2f / 최저 %.2f\n", avgScore, maxScore, minScore)
+
+	// 2-1단계: 검색 품질 평가
+	if err := renderer.SaveQuality(models.QualityResult{
+		Topic:    topic,
+		Version:  a.cfg.PromptVersion,
+		Note:     a.cfg.PromptNote,
+		AvgScore: avgScore,
+		MaxScore: maxScore,
+		MinScore: minScore,
+		RunAt:    time.Now().Format("2006-01-02 15:04:05"),
+	}); err != nil {
+		fmt.Printf("  ⚠ quality.md 저장 실패: %v\n", err)
+	}
 
 	// 3단계: 리포트 작성
 	fmt.Println("\n[3/4] 리포트 작성 중...")
@@ -370,6 +385,9 @@ func (a *Agent) generateQueries(ctx context.Context, topic string) ([]string, er
 규칙:
 - 한 줄에 쿼리 하나씩
 - 번호나 기호 없이 쿼리 텍스트만
+- 주제를 그대로 반복하지 말고 구체적인 핵심 키워드를 포함
+- 각 쿼리는 서로 다른 검색 의도를 가져야 함
+- 동일하거나 의미가 유사한 쿼리는 생성하지 말 것
 - 영어/한국어 혼용 가능
 - 최신 정보를 찾을 수 있게 구체적으로`, a.cfg.MaxSearches, topic)
 
@@ -551,4 +569,28 @@ func (a *Agent) callGemini(ctx context.Context, prompt string) (string, error) {
 	}
 
 	return geminiResp.Candidates[0].Content.Parts[0].Text, nil
+}
+
+// calcQualityStats — 검색 품질 통계 계산
+func calcQualityStats(results []tools.SearchResult) (avg, max, min float64) {
+	if len(results) == 0 {
+		return 0, 0, 0
+	}
+
+	min = results[0].Score
+	max = results[0].Score
+
+	var total float64
+	for _, r := range results {
+		total += r.Score
+		if r.Score > max {
+			max = r.Score
+		}
+		if r.Score < min {
+			min = r.Score
+		}
+	}
+
+	avg = total / float64(len(results))
+	return
 }

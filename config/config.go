@@ -10,6 +10,8 @@ type Config struct {
 	TavilyAPIKey string
 	MaxSearches  int
 	MaxWorkers   int
+	PromptVersion string
+	PromptNote    string
 }
 
 func Load() *Config {
@@ -18,6 +20,8 @@ func Load() *Config {
 		TavilyAPIKey: os.Getenv("TAVILY_API_KEY"),
 		MaxSearches:  6,
 		MaxWorkers:   3,
+		PromptVersion: "v2",
+		PromptNote:    "검색 의도 다양화 및 중복 쿼리 제거",
 	}
 
 	if cfg.GeminiAPIKey == "" {

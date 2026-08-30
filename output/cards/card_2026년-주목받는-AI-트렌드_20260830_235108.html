@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026년 주목받는 AI 트렌드 — 리서치 카드뉴스</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0f;
+    color: #f0f0f5;
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── 헤더 ── */
+  .header {
+    padding: 60px 40px 40px;
+    max-width: 900px;
+    margin: 0 auto;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #7c6bff;
+    background: rgba(124,107,255,0.12);
+    border: 1px solid rgba(124,107,255,0.3);
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+
+  .date {
+    font-size: 12px;
+    color: rgba(240,240,245,0.5);
+  }
+
+  .header h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 900;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+
+  .header h1 span { color: #7c6bff; }
+
+  /* ── 카드 그리드 ── */
+  .cards-section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(240,240,245,0.4);
+    margin-bottom: 28px;
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  /* ── 카드 ── */
+  .card {
+    background: #13131a;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(124,107,255,0.4);
+    box-shadow: 0 16px 48px rgba(124,107,255,0.12);
+  }
+
+  /* 첫 번째 카드는 전체 너비 */
+  .card:first-child {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 28px;
+    background: linear-gradient(135deg, #13131a 0%, #1a1630 100%);
+    border-color: rgba(124,107,255,0.25);
+  }
+
+  .card:first-child .card-emoji { font-size: 52px; flex-shrink: 0; }
+  .card:first-child .card-headline { font-size: 22px; }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .card-emoji { font-size: 32px; line-height: 1; }
+
+  .card-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .tag-트렌드  { color: #7c6bff; background: rgba(124,107,255,0.12); border: 1px solid rgba(124,107,255,0.25); }
+  .tag-핵심    { color: #ff6b9d; background: rgba(255,107,157,0.12); border: 1px solid rgba(255,107,157,0.25); }
+  .tag-데이터  { color: #6bffce; background: rgba(107,255,206,0.12); border: 1px solid rgba(107,255,206,0.25); }
+  .tag-전망    { color: #ffd166; background: rgba(255,209,102,0.12); border: 1px solid rgba(255,209,102,0.25); }
+  .tag-사례    { color: #a8daff; background: rgba(168,218,255,0.12); border: 1px solid rgba(168,218,255,0.25); }
+  .tag-인사이트 { color: #c8b4ff; background: rgba(200,180,255,0.12); border: 1px solid rgba(200,180,255,0.25); }
+
+  .card-number {
+    font-size: 11px;
+    color: rgba(240,240,245,0.4);
+    margin-top: 2px;
+  }
+
+  .card-headline {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .card-body {
+    font-size: 14px;
+    color: rgba(240,240,245,0.7);
+    line-height: 1.7;
+    flex: 1;
+  }
+
+  .divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* ── 출처 ── */
+  .sources-section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 40px 64px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .sources-section h3 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(240,240,245,0.4);
+    margin-bottom: 20px;
+  }
+
+  .source-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .source-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #7c6bff;
+    flex-shrink: 0;
+  }
+
+  .source-item a {
+    font-size: 12px;
+    color: rgba(240,240,245,0.5);
+    text-decoration: none;
+    word-break: break-all;
+    transition: color 0.15s;
+  }
+
+  .source-item a:hover { color: #7c6bff; }
+
+  /* ── 푸터 ── */
+  .footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 11px;
+    color: rgba(240,240,245,0.3);
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .footer span { color: #7c6bff; }
+
+  @media (max-width: 600px) {
+    .header, .cards-section, .sources-section { padding-left: 20px; padding-right: 20px; }
+    .card:first-child { flex-direction: column; }
+    .cards-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-meta">
+    <span class="badge">Research Agent</span>
+    <span class="date">2026년 08월 30일</span>
+  </div>
+  <h1>2026년 주목받는 AI 트렌드<br><span>핵심 인사이트</span></h1>
+</header>
+
+<section class="cards-section">
+  <p class="section-label">// 6개 카드 · 실시간 웹 리서치</p>
+  <div class="cards-grid">
+    
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">🚀</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-전망">전망</span>
+          <span class="card-number">01 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">2026 AI 트렌드: 실행의 시대</h2>
+      <p class="card-body">2026년 인공지능은 단순한 실험을 넘어 기업 운영과 일상에 깊숙이 뿌리내리는 &#39;구조적 실행&#39;의 시대로 진입했습니다. 에이전틱 AI와 물리적 AI가 글로벌 생태계를 주도하고 있습니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">🤖</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-트렌드">트렌드</span>
+          <span class="card-number">02 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">에이전틱 AI의 전면 상용화</h2>
+      <p class="card-body">수동적 프롬프트 반응을 넘어, 스스로 목표를 설정하고 다단계 계획을 수행하는 자율 에이전트가 대중화되었습니다. 2026년 말까지 주요 기업용 앱 상당수에 &#39;디지털 동료&#39;가 내장될 전망입니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">🤝</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-인사이트">인사이트</span>
+          <span class="card-number">03 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">지능형 자동화와 인간 협업</h2>
+      <p class="card-body">기업들은 규칙 기반 업무에서 벗어나 오류를 예측하는 지능형 자동화를 도입하고 있습니다. 인력들은 소모적 작업을 AI에 맡기고 고차원적 전략 수립과 창의적 해결에 집중합니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">🔒</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-핵심">핵심</span>
+          <span class="card-number">04 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">거버넌스와 도메인 특화 모델</h2>
+      <p class="card-body">보안 리스크 최소화와 비용 효율성을 위해 범용 모델 대신 SLM과 도메인 특화 AI 도입이 급증했습니다. 디지털 출처 증명 등 엄격한 거버넌스가 기업 생존의 필수 조건이 되었습니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">🦾</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-트렌드">트렌드</span>
+          <span class="card-number">05 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">물리적 AI와 멀티모달 확장</h2>
+      <p class="card-body">텍스트를 넘어 오디오, 비디오를 포괄하고 로봇 공학과 결합한 &#39;물리적 AI&#39;가 대규모 상용화 단계에 진입했습니다. 휴머노이드 로봇이 실제 산업 현장과 일상에 배치되고 있습니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">⚖️</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-전망">전망</span>
+          <span class="card-number">06 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">속도와 신뢰의 조화</h2>
+      <p class="card-body">2026년 AI의 핵심은 &#39;속도와 신뢰의 조화&#39;입니다. 생산성 혁신과 함께 철저한 거버넌스와 리스크 통제 체계를 갖추는 조직만이 지속 가능한 성장을 이룰 것입니다.</p>
+    </article>
+  </div>
+</section>
+
+<section class="sources-section">
+  <h3>// 참고 출처</h3>
+  
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://encoresky.com/blog/enterprise-ai-adoption-in-2026-key-trends-and-challenges" target="_blank" rel="noopener">https://encoresky.com/blog/enterprise-ai-adoption-in-2026-key-trends-and-challenges</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://www.ziaconsulting.com/blog/enterprise-tech-trends" target="_blank" rel="noopener">https://www.ziaconsulting.com/blog/enterprise-tech-trends</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://research.etr.ai/etr-data-drop/top-10-enterprise-technology-trends-for-2026" target="_blank" rel="noopener">https://research.etr.ai/etr-data-drop/top-10-enterprise-technology-trends-for-2026</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://botpress.com/ko/blog/top-artificial-intelligence-trends" target="_blank" rel="noopener">https://botpress.com/ko/blog/top-artificial-intelligence-trends</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://www.cio.com/article/4076812/ai%EA%B0%80-%EC%A4%91%EC%8B%AC%EC%97%90-%EC%84%A0%EB%8B%A4-%EA%B0%80%ED%8A%B8%EB%84%88-2026%EB%85%84-%EC%A3%BC%EC%9A%94-%EC%A0%84%EB%9E%B5-%EA%B8%B0%EC%88%A0-%ED%8A%B8%EB%A0%8C.html" target="_blank" rel="noopener">https://www.cio.com/article/4076812/ai%EA%B0%80-%EC%A4%91%EC%8B%AC%EC%97%90-%EC%84%A0%EB%8B%A4-%EA%B0%80%ED%8A%B8%EB%84%88-2026%EB%85%84-%EC%A3%BC%EC%9A%94-%EC%A0%84%EB%9E%B5-%EA%B8%B0%EC%88%A0-%ED%8A%B8%EB%A0%8C.html</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://brunch.co.kr/@b2439ea8fc654b8/125" target="_blank" rel="noopener">https://brunch.co.kr/@b2439ea8fc654b8/125</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://www.hristovdevelopment.com/post/emerging-ai-technologies" target="_blank" rel="noopener">https://www.hristovdevelopment.com/post/emerging-ai-technologies</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://www.infotech.com/research/ss/ai-trends-2026" target="_blank" rel="noopener">https://www.infotech.com/research/ss/ai-trends-2026</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://investor.forrester.com/news-releases/news-release-details/forresters-top-10-emerging-technologies-2026-ai-no-longer" target="_blank" rel="noopener">https://investor.forrester.com/news-releases/news-release-details/forresters-top-10-emerging-technologies-2026-ai-no-longer</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://m.blog.naver.com/PostView.naver?blogId=esperoamo&amp;logNo=224201399069" target="_blank" rel="noopener">https://m.blog.naver.com/PostView.naver?blogId=esperoamo&amp;logNo=224201399069</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://v.daum.net/v/HHzYCXrNCJ" target="_blank" rel="noopener">https://v.daum.net/v/HHzYCXrNCJ</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://www.gminsights.com/ko/industry-analysis/generative-ai-market" target="_blank" rel="noopener">https://www.gminsights.com/ko/industry-analysis/generative-ai-market</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://jngr5.com/jngr/ai_research_trends_in_2026" target="_blank" rel="noopener">https://jngr5.com/jngr/ai_research_trends_in_2026</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://www.digitalbricks.ai/blog-posts/7-ai-trends-to-watch-in-2026" target="_blank" rel="noopener">https://www.digitalbricks.ai/blog-posts/7-ai-trends-to-watch-in-2026</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://blog.bytebytego.com/p/whats-next-in-ai-five-trends-to-watch" target="_blank" rel="noopener">https://blog.bytebytego.com/p/whats-next-in-ai-five-trends-to-watch</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://www.cio.com/article/4102194/sas-2026%EB%85%84-ai-%EC%82%B0%EC%97%85%EC%9D%84-%EC%9D%B4%EB%81%8C-8%EA%B0%80%EC%A7%80-%EC%A0%84%EB%A7%9D-%EA%B3%B5%EA%B0%9C%C2%B7%C2%B7%C2%B7%EC%B1%85%EC%9E%84%EC%84%B1%C2%B7roi-%EC%A4%91%EC%9A%94.html" target="_blank" rel="noopener">https://www.cio.com/article/4102194/sas-2026%EB%85%84-ai-%EC%82%B0%EC%97%85%EC%9D%84-%EC%9D%B4%EB%81%8C-8%EA%B0%80%EC%A7%80-%EC%A0%84%EB%A7%9D-%EA%B3%B5%EA%B0%9C%C2%B7%C2%B7%C2%B7%EC%B1%85%EC%9E%84%EC%84%B1%C2%B7roi-%EC%A4%91%EC%9A%94.html</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://zdnet.co.kr/view?no=20251229161240" target="_blank" rel="noopener">https://zdnet.co.kr/view?no=20251229161240</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://m.blog.naver.com/webcashgroup/224074808807" target="_blank" rel="noopener">https://m.blog.naver.com/webcashgroup/224074808807</a>
+  </div>
+</section>
+
+<footer class="footer">
+  Generated by <span>Research Agent</span> — Go + Gemini · 2026년 08월 30일
+</footer>
+
+</body>
+</html>

@@ -9,6 +9,10 @@
 
 | 날짜 | 주제 | 링크 |
 | --- | --- | --- |
+| 2026-08-31 00:23 | Agentic AI의 상용화 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_Agentic-AI의-상용화_20260831_002329.html) |
+| 2026-08-31 00:22 | 2026년 주목받는 AI 트렌드 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_2026년-주목받는-AI-트렌드_20260831_002238.html) |
+| 2026-08-30 23:53 | Agentic AI의 상용화 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_Agentic-AI의-상용화_20260830_235325.html) |
+| 2026-08-30 23:51 | 2026년 주목받는 AI 트렌드 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_2026년-주목받는-AI-트렌드_20260830_235108.html) |
 | 2026-08-25 01:23 | 2026년 상반기 multi-agent 논문 동향 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards/card_2026년-상반기-multi-agent-논문-동향_20260825_012301.html) |
 | 2026-08-21 12:07 | 2026 IT 핵심 키워드 | [보기](https://htmlpreview.github.io/?https://github.com/susooo/research-agent/blob/main/output/cards_2026-IT-핵심-키워드_20260821_120658.html) |
 

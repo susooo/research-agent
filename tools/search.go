@@ -13,6 +13,7 @@ type SearchResult struct {
 	Title   string
 	URL     string
 	Content string
+	Score   float64
 }
 
 type TavilySearcher struct {
@@ -32,6 +33,7 @@ type tavilyResponse struct {
 		Title   string `json:"title"`
 		URL     string `json:"url"`
 		Content string `json:"content"`
+		Score   float64 `json:"score"`
 	} `json:"results"`
 }
 
@@ -76,6 +78,7 @@ func (s *TavilySearcher) Search(query string) ([]SearchResult, error) {
 			Title:   r.Title,
 			URL:     r.URL,
 			Content: r.Content,
+			Score:   r.Score,
 		})
 	}
 

@@ -17,6 +17,17 @@ type CardContent struct {
 	Tag        string
 }
 
+// QualityResult — 검색 품질 측정 결과
+type QualityResult struct {
+	Topic    string
+	Version  string
+	Note     string
+	AvgScore float64
+	MaxScore float64
+	MinScore float64
+	RunAt    string
+}
+
 // BenchmarkResult — 벤치마크 결과
 type BenchmarkResult struct {
 	Topic       string
