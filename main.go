@@ -32,7 +32,7 @@ func main() {
 	printBanner()
 
 	// ── Step 1: 모드 선택 ──
-	fmt.Print(colorCyan + "\n모드 선택 [1: 리서치  2: 벤치마크  3: 트레이드오프]: " + colorReset)
+	fmt.Print(colorCyan + "\n모드 선택 [1: 리서치  2: 병렬vs순차  3: 트레이드오프]: " + colorReset)
 	scanner.Scan()
 	mode := strings.TrimSpace(scanner.Text())
 
