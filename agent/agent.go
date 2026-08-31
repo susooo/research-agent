@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	// "io"
 	"net/http"
 	"strings"
 	"time"
@@ -58,7 +57,9 @@ func New(cfg *config.Config) *Agent {
 	}
 }
 
+// ────────────────────────────────────────
 // Research — 전체 리서치 흐름
+// ────────────────────────────────────────
 func (a *Agent) Research(topic string) (*models.Report, error) {
 	ctx := context.Background()
 	totalStart := time.Now()
@@ -83,59 +84,15 @@ func (a *Agent) Research(topic string) (*models.Report, error) {
 		return nil, fmt.Errorf("웹 검색 실패: %w", err)
 	}
 
-	// 2-1단계: 신뢰도 낮은 출처 차단
-	var filteredResults []tools.SearchResult
-	var blockedCount, lowScoreCount int
-
-	for _, r := range results {
-		// 차단 도메인 확인
-		if a.isBlockedDomain(r.URL) {
-			blockedCount++
-			continue
-		}
-		// Score 임계값 확인
-		if r.Score < a.cfg.MinScore {
-			lowScoreCount++
-			continue
-		}
-		filteredResults = append(filteredResults, r)
-	}
-
-	fmt.Printf("  → 전체 %d개 중 신뢰 결과 %d개 사용\n",
-		len(results), len(filteredResults))
-	fmt.Printf("    차단 도메인: %d개 / Score 미달(%.1f 미만): %d개\n",
-		blockedCount, a.cfg.MinScore, lowScoreCount)
-
-	// 결과 너무 적으면 Score 기준 완화 (차단 도메인은 유지)
-	if len(filteredResults) < 5 {
-		fmt.Println("  ⚠ 결과 부족 → Score 기준 0.5로 완화")
-		filteredResults = nil
-		for _, r := range results {
-			if a.isBlockedDomain(r.URL) {
-				continue
-			}
-			if r.Score >= 0.5 {
-				filteredResults = append(filteredResults, r)
-			}
-		}
-		fmt.Printf("  → 완화 후 %d개 사용\n", len(filteredResults))
-	}
-
+	// 2-1단계: 신뢰도 낮은 출처 필터링
+	filteredResults, blockedCount, lowScoreCount := a.filterResults(results)
+	fmt.Printf("  → 전체 %d개 중 신뢰 결과 %d개 사용\n", len(results), len(filteredResults))
+	fmt.Printf("    차단 도메인: %d개 / Score 미달(%.1f 미만): %d개\n", blockedCount, a.cfg.MinScore, lowScoreCount)
+		
 	// 2-2단계: 검색 품질 평가
 	avgScore, maxScore, minScore := calcQualityStats(filteredResults)
 	fmt.Printf("  → 검색 품질 점수: 평균 %.2f / 최고 %.2f / 최저 %.2f\n", avgScore, maxScore, minScore)
-
-	if err := renderer.SaveQuality(models.QualityResult{
-		Topic:    topic,
-		Version:  a.cfg.PromptVersion,
-		Note:     a.cfg.PromptNote,
-		AvgScore: avgScore,
-		MaxScore: maxScore,
-		MinScore: minScore,
-		RunAt:    time.Now().Format("2006-01-02 15:04:05"),
-	}); err != nil {
-		fmt.Printf("  ⚠ quality.md 저장 실패: %v\n", err)
-	}
+	a.saveQuality(topic, avgScore, maxScore, minScore)
 
 	// 3단계: 리포트 작성
 	fmt.Println("\n[3/4] 리포트 작성 중...")
@@ -154,28 +111,12 @@ func (a *Agent) Research(topic string) (*models.Report, error) {
 	step4Time := time.Since(step4Start)
 
 	if err != nil {
-		// 카드 실패는 치명적이지 않음 — 리포트는 살림
 		fmt.Printf("  ⚠ 카드 추출 실패 (리포트는 정상): %v\n", err)
 	}
 
-	totalTime := time.Since(totalStart)
 	// Breakdown 출력
-	fmt.Println()
-	fmt.Println(strings.Repeat("─", 45))
-	fmt.Println("⏱ 소요 시간 Breakdown")
-	fmt.Println(strings.Repeat("─", 45))
-	fmt.Printf("  [1/4] 쿼리 생성:   %5.1fs  (Gemini API)\n",
-		step1Time.Seconds())
-	fmt.Printf("  [2/4] 병렬 검색:   %5.1fs  (Tavily × %d 병렬)\n",
-		step2Time.Seconds(), a.cfg.MaxWorkers)
-	fmt.Printf("  [3/4] 리포트 작성: %5.1fs  (Gemini API)\n",
-		step3Time.Seconds())
-	fmt.Printf("  [4/4] 카드 추출:   %5.1fs  (Gemini API)\n",
-		step4Time.Seconds())
-	fmt.Println(strings.Repeat("─", 45))
-	fmt.Printf("  총 소요 시간:      %5.1fs\n", totalTime.Seconds())
-	fmt.Printf("  검색 품질 점수:    %.2f / 1.0\n", avgScore)
-	fmt.Println(strings.Repeat("─", 45))
+	a.printBreakdown(step1Time, step2Time, step3Time, step4Time,
+		time.Since(totalStart), avgScore)
 
 	// 출처 URL 수집 (중복 제거)
 	var sources []string
@@ -191,9 +132,128 @@ func (a *Agent) Research(topic string) (*models.Report, error) {
 		Topic:    topic,
 		Markdown: markdown,
 		Cards:    cards,
-		Sources:  sources,
+		Sources:  collectSources(filteredResults),
 	}, nil
 }
+
+// ────────────────────────────────────────
+// 내부 헬퍼 함수들
+// ────────────────────────────────────────
+
+// filterResults — 신뢰도 낮은 결과 제거
+func (a *Agent) filterResults(results []tools.SearchResult) (filtered []tools.SearchResult, blockedCount, lowScoreCount int) {
+	for _, r := range results {
+		if a.isBlockedDomain(r.URL) {
+			blockedCount++
+			continue
+		}
+		if r.Score < a.cfg.MinScore {
+			lowScoreCount++
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+
+	// 결과 부족 시 Score 기준 완화 (차단 도메인은 유지)
+	if len(filtered) < 5 {
+		fmt.Printf("  ⚠ 결과 부족 → Score 기준 %.1f로 완화\n", a.cfg.FallbackScore)
+		filtered = nil
+		for _, r := range results {
+			if a.isBlockedDomain(r.URL) {
+				continue
+			}
+			if r.Score >= a.cfg.FallbackScore {
+				filtered = append(filtered, r)
+			}
+		}
+		fmt.Printf("  → 완화 후 %d개 사용\n", len(filtered))
+	}
+
+	return
+}
+
+// saveQuality — 검색 품질 저장
+func (a *Agent) saveQuality(topic string, avgScore, maxScore, minScore float64) {
+	if err := renderer.SaveQuality(models.QualityResult{
+		Topic:    topic,
+		Version:  a.cfg.PromptVersion,
+		Note:     a.cfg.PromptNote,
+		AvgScore: avgScore,
+		MaxScore: maxScore,
+		MinScore: minScore,
+		RunAt:    time.Now().Format("2006-01-02 15:04:05"),
+	}); err != nil {
+		fmt.Printf("  ⚠ quality.md 저장 실패: %v\n", err)
+	}
+}
+
+// printBreakdown — 소요 시간 출력
+func (a *Agent) printBreakdown(s1, s2, s3, s4, total time.Duration, avgScore float64) {
+	fmt.Println()
+	fmt.Println(strings.Repeat("─", 45))
+	fmt.Println("⏱ 소요 시간 Breakdown")
+	fmt.Println(strings.Repeat("─", 45))
+	fmt.Printf("  [1/4] 쿼리 생성:   %5.1fs  (Gemini API)\n", s1.Seconds())
+	fmt.Printf("  [2/4] 병렬 검색:   %5.1fs  (Tavily × %d 병렬)\n",
+		s2.Seconds(), a.cfg.MaxWorkers)
+	fmt.Printf("  [3/4] 리포트 작성: %5.1fs  (Gemini API)\n", s3.Seconds())
+	fmt.Printf("  [4/4] 카드 추출:   %5.1fs  (Gemini API)\n", s4.Seconds())
+	fmt.Println(strings.Repeat("─", 45))
+	fmt.Printf("  총 소요 시간:      %5.1fs\n", total.Seconds())
+	fmt.Printf("  검색 품질 점수:    %.2f / 1.0\n", avgScore)
+	fmt.Println(strings.Repeat("─", 45))
+}
+
+// collectSources — 출처 URL 수집 (중복 제거)
+func collectSources(results []tools.SearchResult) []string {
+	var sources []string
+	seen := map[string]bool{}
+	for _, r := range results {
+		if !seen[r.URL] {
+			sources = append(sources, r.URL)
+			seen[r.URL] = true
+		}
+	}
+	return sources
+}
+
+// isBlockedDomain — config 기반 차단 도메인 확인
+func (a *Agent) isBlockedDomain(url string) bool {
+	for _, domain := range a.cfg.BlockedDomains {
+		if strings.Contains(url, domain) {
+			return true
+		}
+	}
+	return false
+}
+
+// calcQualityStats — 검색 품질 통계 계산
+func calcQualityStats(results []tools.SearchResult) (avg, max, min float64) {
+	if len(results) == 0 {
+		return 0, 0, 0
+	}
+
+	min = results[0].Score
+	max = results[0].Score
+
+	var total float64
+	for _, r := range results {
+		total += r.Score
+		if r.Score > max {
+			max = r.Score
+		}
+		if r.Score < min {
+			min = r.Score
+		}
+	}
+
+	avg = total / float64(len(results))
+	return
+}
+
+// ────────────────────────────────────────
+// 벤치마크
+// ────────────────────────────────────────
 
 // BenchmarkParallel — 병렬 vs 순차 실행 시간 비교
 func (a *Agent) BenchmarkParallel(topic string) error {
@@ -217,10 +277,10 @@ func (a *Agent) BenchmarkParallel(topic string) error {
 
 	// 2. 순차 실행
 	fmt.Println("\n[1/2] 순차 실행 중...")
-
 	seqStart := time.Now()
 	_, err = a.orch.RunSequential(ctx, queries)
 	seqTime := time.Since(seqStart)
+
 	if err != nil {
 		return fmt.Errorf("순차 실행 실패: %w", err)
 	}
@@ -228,10 +288,10 @@ func (a *Agent) BenchmarkParallel(topic string) error {
 
 	// 3. 병렬 실행
 	fmt.Println("\n[2/2] 병렬 실행 중...")
-
 	parStart := time.Now()
 	_, err = a.orch.RunParallel(ctx, queries)
 	parTime := time.Since(parStart)
+
 	if err != nil {
 		return fmt.Errorf("병렬 실행 실패: %w", err)
 	}
@@ -252,9 +312,7 @@ func (a *Agent) BenchmarkParallel(topic string) error {
 	fmt.Println(strings.Repeat("─", 50))
 
 	// ── 파일 저장 ──
-	fmt.Println()
-
-	err = renderer.SaveBenchmark(models.BenchmarkResult{
+	if err := renderer.SaveBenchmark(models.BenchmarkResult{
 		Topic:       topic,
 		SeqTime:     seqTime.Milliseconds(),
 		ParTime:     parTime.Milliseconds(),
@@ -262,14 +320,12 @@ func (a *Agent) BenchmarkParallel(topic string) error {
 		Improvement: improvement,
 		Reduction:   reduction,
 		RunAt:       time.Now().Format("2006-01-02 15:04:05"),
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("벤치마크 저장 실패: %w", err)
 	}
 
 	fmt.Println("✅ benchmark.md 저장 완료!")
 	fmt.Println("📄 저장 위치: output/benchmark.md")
-
 	return nil
 }
 
@@ -292,158 +348,107 @@ func (a *Agent) BenchmarkWorkers(topic string) error {
 	}
 	fmt.Println()
 
-	// ==============================
-	// 1. 순차 실행 (기준값)
-	// ==============================
+	// 순차 실행 (기준값)
 	fmt.Println("[기준] 순차 실행 중...")
+	seqResult, err := a.runWithMetrics(ctx, 1, queries, nil)
 
-	runtime.GC()
-	var seqMemBefore runtime.MemStats
-	runtime.ReadMemStats(&seqMemBefore)
-
-	seqStart := time.Now()
-	_, seqErr := a.orch.RunSequential(ctx, queries)
-	seqTime := time.Since(seqStart)
-	
-	var seqMemAfter runtime.MemStats
-	runtime.ReadMemStats(&seqMemAfter)
-	seqMemMB := float64(seqMemAfter.TotalAlloc-seqMemBefore.TotalAlloc) / 1024 / 1024 //Byte를 MB로 변환
-
-	seqResult := models.TradeoffResult{
-		Workers:   1,
-		ElapsedMs: seqTime.Milliseconds(),
-		MemoryMB:  seqMemMB,
-		Failed:    seqErr != nil,
-	}
-
-	if seqErr != nil {
-		fmt.Printf("실패: %v\n", seqErr)
-
-		// 순차 실행 실패 결과 저장
-		err := renderer.SaveTradeoffBenchmark(
-			models.TradeoffBenchmarkResult{
-				Topic:   topic,
-				RunAt:   time.Now().Format("2006-01-02 15:04:05"),
-				Results: []models.TradeoffResult{
-					seqResult,
-				},
-			},
-		)
-
-		if err != nil {
-			return fmt.Errorf("벤치마크 저장 실패: %w", err)
+	if err != nil {
+		if saveErr := renderer.SaveTradeoffBenchmark(models.TradeoffBenchmarkResult{
+			Topic:   topic,
+			RunAt:   time.Now().Format("2006-01-02 15:04:05"),
+			Results: []models.TradeoffResult{seqResult},
+		}); saveErr != nil {
+			fmt.Printf("  ⚠ 저장 실패: %v\n", saveErr)
 		}
-
-		return fmt.Errorf("순차 실행 실패: %w", seqErr)
+		return fmt.Errorf("순차 실행 실패: %w", err)
 	}
+	fmt.Printf("완료: %dms | 메모리: %.2fMB\n\n", seqResult.ElapsedMs, seqResult.MemoryMB)
 
-	// ==============================
-	// 2. Worker 수별 병렬 실행
-	// ==============================
+	// 워커별 병렬 실행
 	workerCounts := []int{2, 3, 4, 6}
 	var tradeoffResults []models.TradeoffResult
 
 	for _, w := range workerCounts {
 		fmt.Printf("[워커 %d개] 병렬 실행 중...\n", w)
+		tempOrch := orchestrator.New(tools.NewSearcher(a.cfg.TavilyAPIKey), w)
+		result, err := a.runWithMetrics(ctx, w, queries, tempOrch)
+		tradeoffResults = append(tradeoffResults, result)
 
-		tempOrch := orchestrator.New(
-			tools.NewSearcher(a.cfg.TavilyAPIKey),
-			w,
-		)
-
-		runtime.GC()
-		var memBefore runtime.MemStats
-		runtime.ReadMemStats(&memBefore)
-
-		start := time.Now()
-		_, workerErr := tempOrch.RunParallel(ctx, queries)
-		elapsed := time.Since(start)
-		
-		var memAfter runtime.MemStats
-		runtime.ReadMemStats(&memAfter)
-		memMB := float64(memAfter.TotalAlloc-memBefore.TotalAlloc) / 1024 / 1024
-
-		result := models.TradeoffResult{
-			Workers:   w,
-			ElapsedMs: elapsed.Milliseconds(),
-			MemoryMB:  memMB,
-			Failed:    workerErr != nil,
-		}
-
-		tradeoffResults = append(
-			tradeoffResults,
-			result,
-		)
-
-		// 실패한 Worker는 기록만 하고 다음 Worker 진행
-		if workerErr != nil {
-			fmt.Printf("실패: %v\n\n", workerErr)
+		if err != nil {
+			fmt.Printf("  실패: %v\n\n", err)
 			continue
 		}
 
-		improvement := float64(seqTime) / float64(elapsed)
-
-		fmt.Printf(
-			"완료: %dms (순차 대비 %.1f배)\n\n",
-			elapsed.Milliseconds(),
-			improvement,
-		)
+		improvement := float64(seqResult.ElapsedMs) / float64(result.ElapsedMs)
+		fmt.Printf("  완료: %dms | 메모리: %.2fMB | 순차 대비 %.1f배\n\n",
+			result.ElapsedMs, result.MemoryMB, improvement)
 	}
 
-	// ==============================
-	// 3. 간단한 결과 출력
-	// ==============================
+	// 결과 출력
 	fmt.Println(strings.Repeat("─", 50))
 	fmt.Println("⚡ 워커 수별 결과")
 	fmt.Println(strings.Repeat("─", 50))
 	fmt.Printf("  %-12s %10dms  기준\n", "1 (순차)", seqResult.ElapsedMs)
 	for _, r := range tradeoffResults {
 		if r.Failed {
-			fmt.Printf(
-				"  %-12s %10dms  실패\n",
-				fmt.Sprintf("워커 %d개", r.Workers),
-				r.ElapsedMs,
-			)
+			fmt.Printf("  %-12s %10dms  실패\n",
+				fmt.Sprintf("워커 %d개", r.Workers), r.ElapsedMs)
 			continue
 		}
-
 		improvement := float64(seqResult.ElapsedMs) / float64(r.ElapsedMs)
-
-		fmt.Printf(
-			"  %-12s %10dms  %.1f배\n",
-			fmt.Sprintf("워커 %d개", r.Workers),
-			r.ElapsedMs,
-			improvement,
-		)
+		fmt.Printf("  %-12s %10dms  %.1f배\n",
+			fmt.Sprintf("워커 %d개", r.Workers), r.ElapsedMs, improvement)
 	}
 	fmt.Println(strings.Repeat("─", 50))
 
-	// ==============================
-	// 4. 전체 결과 저장
-	// ==============================
-	allResults := []models.TradeoffResult{
-		seqResult,
-	}
-
-	allResults = append(allResults, tradeoffResults...)
-
-	err = renderer.SaveTradeoffBenchmark(
-		models.TradeoffBenchmarkResult{
-			Topic:   topic,
-			RunAt:   time.Now().Format("2006-01-02 15:04:05"),
-			Results: allResults,
-		},
-	)
-
-	if err != nil {
+	// 결과 저장
+	allResults := append([]models.TradeoffResult{seqResult}, tradeoffResults...)
+	if err := renderer.SaveTradeoffBenchmark(models.TradeoffBenchmarkResult{
+		Topic:   topic,
+		RunAt:   time.Now().Format("2006-01-02 15:04:05"),
+		Results: allResults,
+	}); err != nil {
 		return fmt.Errorf("워커 벤치마크 저장 실패: %w", err)
 	}
 
 	fmt.Println("\n✅ benchmark.md 워커별 결과 저장 완료!")
 	fmt.Println("📄 저장 위치: output/benchmark.md")
-
 	return nil
 }
+
+// runWithMetrics — 실행 시간 + 메모리 측정 헬퍼
+// orch가 nil이면 순차 실행
+func (a *Agent) runWithMetrics(ctx context.Context, workers int, queries []string, orch *orchestrator.Orchestrator) (models.TradeoffResult, error) {
+	runtime.GC()
+	var memBefore runtime.MemStats
+	runtime.ReadMemStats(&memBefore)
+
+	start := time.Now()
+	var err error
+
+	if orch == nil {
+		_, err = a.orch.RunSequential(ctx, queries)
+	} else {
+		_, err = orch.RunParallel(ctx, queries)
+	}
+
+	elapsed := time.Since(start)
+
+	var memAfter runtime.MemStats
+	runtime.ReadMemStats(&memAfter)
+	memMB := float64(memAfter.TotalAlloc-memBefore.TotalAlloc) / 1024 / 1024
+
+	return models.TradeoffResult{
+		Workers:   workers,
+		ElapsedMs: elapsed.Milliseconds(),
+		MemoryMB:  memMB,
+		Failed:    err != nil,
+	}, err
+}
+
+// ────────────────────────────────────────
+// LLM 호출
+// ────────────────────────────────────────
 
 // generateQueries — Gemini로 검색 쿼리 생성
 func (a *Agent) generateQueries(ctx context.Context, topic string) ([]string, error) {
@@ -463,7 +468,6 @@ func (a *Agent) generateQueries(ctx context.Context, topic string) ([]string, er
 		return nil, err
 	}
 
-	// 응답을 줄 단위로 파싱
 	var queries []string
 	for _, line := range strings.Split(resp, "\n") {
 		line = strings.TrimSpace(line)
@@ -472,7 +476,6 @@ func (a *Agent) generateQueries(ctx context.Context, topic string) ([]string, er
 		}
 	}
 
-	// MaxSearches 초과하면 자르기
 	if len(queries) > a.cfg.MaxSearches {
 		queries = queries[:a.cfg.MaxSearches]
 	}
@@ -482,7 +485,6 @@ func (a *Agent) generateQueries(ctx context.Context, topic string) ([]string, er
 
 // generateReport — 검색 결과로 마크다운 리포트 작성
 func (a *Agent) generateReport(ctx context.Context, topic string, results []tools.SearchResult) (string, error) {
-	// 검색 결과를 프롬프트에 담기 (최대 15개)
 	var sb strings.Builder
 	for i, r := range results {
 		if i >= 15 {
@@ -538,14 +540,12 @@ func (a *Agent) extractCards(ctx context.Context, markdown string) ([]models.Car
 		return nil, err
 	}
 
-	// JSON 펜스 제거 (```json ... ``` 형태로 올 수 있음)
 	resp = strings.TrimSpace(resp)
 	resp = strings.TrimPrefix(resp, "```json")
 	resp = strings.TrimPrefix(resp, "```")
 	resp = strings.TrimSuffix(resp, "```")
 	resp = strings.TrimSpace(resp)
 
-	// JSON 파싱
 	var raw []struct {
 		CardNumber int    `json:"card_number"`
 		Headline   string `json:"headline"`
@@ -601,32 +601,14 @@ func (a *Agent) callGemini(ctx context.Context, prompt string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	/*
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("Gemini 응답 읽기 실패: %w", err)
-	}
-
-	fmt.Printf("Gemini 원본 응답: %s\n", string(bodyBytes))
-	*/
-
-	// HTTP 에러 먼저 확인
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf(
-			"Gemini API 오류 (status=%d)",
-			resp.StatusCode,
-		)
+		return "", fmt.Errorf("Gemini API 오류 (status=%d)", resp.StatusCode)
 	}
 
 	var geminiResp geminiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&geminiResp); err != nil {
     	return "", fmt.Errorf("Gemini 응답 파싱 실패: %w", err)
 	}
-	/*
-	if err := json.Unmarshal(bodyBytes, &geminiResp); err != nil {
-    	return "", fmt.Errorf("Gemini 응답 파싱 실패: %w", err)
-	}
-	*/
 	
 	if len(geminiResp.Candidates) == 0 ||
 		len(geminiResp.Candidates[0].Content.Parts) == 0 {
@@ -636,38 +618,4 @@ func (a *Agent) callGemini(ctx context.Context, prompt string) (string, error) {
 	}
 
 	return geminiResp.Candidates[0].Content.Parts[0].Text, nil
-}
-
-// calcQualityStats — 검색 품질 통계 계산
-func calcQualityStats(results []tools.SearchResult) (avg, max, min float64) {
-	if len(results) == 0 {
-		return 0, 0, 0
-	}
-
-	min = results[0].Score
-	max = results[0].Score
-
-	var total float64
-	for _, r := range results {
-		total += r.Score
-		if r.Score > max {
-			max = r.Score
-		}
-		if r.Score < min {
-			min = r.Score
-		}
-	}
-
-	avg = total / float64(len(results))
-	return
-}
-
-// isBlockedDomain — config 기반 차단 도메인 확인
-func (a *Agent) isBlockedDomain(url string) bool {
-    for _, domain := range a.cfg.BlockedDomains {
-        if strings.Contains(url, domain) {
-            return true
-        }
-    }
-    return false
 }

@@ -14,6 +14,7 @@ type Config struct {
 	PromptNote    string
 	BlockedDomains []string
 	MinScore       float64
+	FallbackScore  float64
 }
 
 func Load() *Config {
@@ -25,6 +26,7 @@ func Load() *Config {
 		PromptVersion: "v2",
 		PromptNote:    "검색 의도 다양화 및 중복 쿼리 제거",
 		MinScore:      0.7,
+		FallbackScore: 0.5,
 		BlockedDomains: []string{
             "blog.naver.com",
 			"tistory.com",

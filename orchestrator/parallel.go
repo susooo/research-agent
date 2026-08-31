@@ -64,7 +64,6 @@ func (o *Orchestrator) RunParallel(ctx context.Context, queries []string) ([]too
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
-				//context 취소 확인 (타임아웃 등)
 				select {
 				case <-ctx.Done():
 					results <- result{index: j.index, err: ctx.Err()}
@@ -72,7 +71,6 @@ func (o *Orchestrator) RunParallel(ctx context.Context, queries []string) ([]too
 				default:
 				}
 				
-				//검색 시간 측정
 				start := time.Now()
 				searchResults, err := o.searcher.Search(j.query)
 				elapsed := time.Since(start)
