@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go언어 vs Rust 비교 — 리서치 카드뉴스</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0f;
+    color: #f0f0f5;
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── 헤더 ── */
+  .header {
+    padding: 60px 40px 40px;
+    max-width: 900px;
+    margin: 0 auto;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #7c6bff;
+    background: rgba(124,107,255,0.12);
+    border: 1px solid rgba(124,107,255,0.3);
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+
+  .date {
+    font-size: 12px;
+    color: rgba(240,240,245,0.5);
+  }
+
+  .header h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 900;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+
+  .header h1 span { color: #7c6bff; }
+
+  /* ── 카드 그리드 ── */
+  .cards-section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(240,240,245,0.4);
+    margin-bottom: 28px;
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  /* ── 카드 ── */
+  .card {
+    background: #13131a;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(124,107,255,0.4);
+    box-shadow: 0 16px 48px rgba(124,107,255,0.12);
+  }
+
+  /* 첫 번째 카드는 전체 너비 */
+  .card:first-child {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 28px;
+    background: linear-gradient(135deg, #13131a 0%, #1a1630 100%);
+    border-color: rgba(124,107,255,0.25);
+  }
+
+  .card:first-child .card-emoji { font-size: 52px; flex-shrink: 0; }
+  .card:first-child .card-headline { font-size: 22px; }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .card-emoji { font-size: 32px; line-height: 1; }
+
+  .card-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .tag-트렌드  { color: #7c6bff; background: rgba(124,107,255,0.12); border: 1px solid rgba(124,107,255,0.25); }
+  .tag-핵심    { color: #ff6b9d; background: rgba(255,107,157,0.12); border: 1px solid rgba(255,107,157,0.25); }
+  .tag-데이터  { color: #6bffce; background: rgba(107,255,206,0.12); border: 1px solid rgba(107,255,206,0.25); }
+  .tag-전망    { color: #ffd166; background: rgba(255,209,102,0.12); border: 1px solid rgba(255,209,102,0.25); }
+  .tag-사례    { color: #a8daff; background: rgba(168,218,255,0.12); border: 1px solid rgba(168,218,255,0.25); }
+  .tag-인사이트 { color: #c8b4ff; background: rgba(200,180,255,0.12); border: 1px solid rgba(200,180,255,0.25); }
+
+  .card-number {
+    font-size: 11px;
+    color: rgba(240,240,245,0.4);
+    margin-top: 2px;
+  }
+
+  .card-headline {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .card-body {
+    font-size: 14px;
+    color: rgba(240,240,245,0.7);
+    line-height: 1.7;
+    flex: 1;
+  }
+
+  .divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* ── 출처 ── */
+  .sources-section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 40px 64px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .sources-section h3 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(240,240,245,0.4);
+    margin-bottom: 20px;
+  }
+
+  .source-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .source-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #7c6bff;
+    flex-shrink: 0;
+  }
+
+  .source-item a {
+    font-size: 12px;
+    color: rgba(240,240,245,0.5);
+    text-decoration: none;
+    word-break: break-all;
+    transition: color 0.15s;
+  }
+
+  .source-item a:hover { color: #7c6bff; }
+
+  /* ── 푸터 ── */
+  .footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 11px;
+    color: rgba(240,240,245,0.3);
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .footer span { color: #7c6bff; }
+
+  @media (max-width: 600px) {
+    .header, .cards-section, .sources-section { padding-left: 20px; padding-right: 20px; }
+    .card:first-child { flex-direction: column; }
+    .cards-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-meta">
+    <span class="badge">Research Agent</span>
+    <span class="date">2026년 10월 24일</span>
+  </div>
+  <h1>Go언어 vs Rust 비교<br><span>핵심 인사이트</span></h1>
+</header>
+
+<section class="cards-section">
+  <p class="section-label">// 6개 카드 · 실시간 웹 리서치</p>
+  <div class="cards-grid">
+    
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">🔥</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-트렌드">트렌드</span>
+          <span class="card-number">01 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">Go vs Rust 대격돌</h2>
+      <p class="card-body">최근 클라우드와 쿠버네티스 환경에서 가장 주목받는 두 프로그래밍 언어, Go와 Rust를 비교합니다. 스택오버홀 조사 기준 사용 비율은 Go 16.4%, Rust 14.8%로 팽팽합니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">🌐</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-데이터">데이터</span>
+          <span class="card-number">02 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">생태계와 채택 현황</h2>
+      <p class="card-body">Go와 Rust는 백엔드 및 시스템 프로그래밍의 핵심 언어로 자리 잡았습니다. 활발한 커뮤니티와 기업 지원을 바탕으로 클라우드 Native 환경에서 영향력을 빠르게 넓히고 있습니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">⚡</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-핵심">핵심</span>
+          <span class="card-number">03 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">성능과 메모리 관리</h2>
+      <p class="card-body">Go는 가비지 컬렉터와 고루틴으로 대규모 동시성 처리에 강점을 보입니다. 반면 Rust는 GC 없이 컴파일 타임 소유권 시스템으로 최고 수준의 메모리 안전성과 원시 성능을 제공합니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">📈</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-인사이트">인사이트</span>
+          <span class="card-number">04 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">학습 곡선과 생산성</h2>
+      <p class="card-body">Go는 문법이 단순해 신규 개발자가 빠르게 습득하고 대규모 협업에 유리합니다. Rust는 초기 학습 곡선이 가파르지만 런타임 오류가 적고 유지보수가 안정적인 코드를 작성할 수 있습니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">🎯</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-사례">사례</span>
+          <span class="card-number">05 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">사용 목적과 적합 도메인</h2>
+      <p class="card-body">Go는 RESTful API와 클라우드 인프라 등 웹 백엔드 개발에 최적화되어 있습니다. Rust는 고성능 시스템 소프트웨어와 자원 최적화가 필수적인 인프라 컴포넌트에 주로 선택됩니다.</p>
+    </article>
+    <article class="card">
+      <div class="card-top">
+        <span class="card-emoji">💡</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="card-tag tag-전망">전망</span>
+          <span class="card-number">06 / 06</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h2 class="card-headline">상호보완적인 두 언어</h2>
+      <p class="card-body">Go는 빠른 개발 속도와 단순성으로 클라우드 백엔드에서 강력한 생산성을 발휘합니다. 프로젝트의 요구사항과 성능 우선순위에 맞춰 적절한 언어를 선택하는 것이 핵심입니다.</p>
+    </article>
+  </div>
+</section>
+
+<section class="sources-section">
+  <h3>// 참고 출처</h3>
+  
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://www.youtube.com/watch?v=ZfvpUDGGr24" target="_blank" rel="noopener">https://www.youtube.com/watch?v=ZfvpUDGGr24</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://blog.jetbrains.com/rust/2025/06/12/rust-vs-go" target="_blank" rel="noopener">https://blog.jetbrains.com/rust/2025/06/12/rust-vs-go</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://appmaster.io/ko/blog/rust-vs-go-bigyo-baegendeu-gaebal" target="_blank" rel="noopener">https://appmaster.io/ko/blog/rust-vs-go-bigyo-baegendeu-gaebal</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://dev.to/built-from-africa/the-moment-veltrix-became-the-constraint-and-how-we-fixed-it-4ipj" target="_blank" rel="noopener">https://dev.to/built-from-africa/the-moment-veltrix-became-the-constraint-and-how-we-fixed-it-4ipj</a>
+  </div>
+  <div class="source-item">
+    <div class="source-dot"></div>
+    <a href="https://nixsanctuary.com/go-versus-rust-in-2024-measuring-the-best-with-15-benchmarks-for-everyday-tasks/" target="_blank" rel="noopener">https://nixsanctuary.com/go-versus-rust-in-2024-measuring-the-best-with-15-benchmarks-for-everyday-tasks/</a>
+  </div>
+</section>
+
+<footer class="footer">
+  Generated by <span>Research Agent</span> — Go + Gemini · 2026년 10월 24일
+</footer>
+
+</body>
+</html>

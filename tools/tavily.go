@@ -44,8 +44,7 @@ func NewSearcher(apiKey string) *TavilySearcher {
 	}
 }
 
-// 단일 검색
-// Goroutine에서 병렬로 호출
+// Search — 웹 검색 (기본 검색)
 func (s *TavilySearcher) Search(query string) ([]SearchResult, error) {
 	reqBody := tavilyRequest{
 		APIKey:      s.APIKey,
@@ -62,13 +61,13 @@ func (s *TavilySearcher) Search(query string) ([]SearchResult, error) {
 		bytes.NewBuffer(body), //HTTP가 이해하는 바이트 스트림 형태로 포장
 	)
 	if err != nil {
-		return nil, fmt.Errorf("검색 요청 실패 [%s]: %w", query, err) //인터넷 끊김, Tavily 서버 다운 등
+		return nil, fmt.Errorf("Tavily 검색 요청 실패 [%s]: %w", query, err) //인터넷 끊김, Tavily 서버 다운 등
 	}
 	defer resp.Body.Close()
 
 	var tavilyResp tavilyResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tavilyResp); err != nil {
-		return nil, fmt.Errorf("응답 파싱 실패: %w", err)
+		return nil, fmt.Errorf("Tavily 응답 파싱 실패: %w", err)
 	}
 
 	var results []SearchResult

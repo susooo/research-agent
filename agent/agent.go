@@ -22,6 +22,7 @@ type Agent struct {
 	cfg        *config.Config
 	httpClient *http.Client
 	orch       *orchestrator.Orchestrator
+	exa        *tools.ExaSearcher
 }
 
 type geminiRequest struct {
@@ -54,6 +55,7 @@ func New(cfg *config.Config) *Agent {
 		cfg: cfg,
 		httpClient: &http.Client{Timeout: 60 * time.Second},
 		orch: orch,
+		exa:        tools.NewExaSearcher(cfg.ExaAPIKey),
 	}
 }
 
@@ -63,76 +65,154 @@ func New(cfg *config.Config) *Agent {
 func (a *Agent) Research(topic string) (*models.Report, error) {
 	ctx := context.Background()
 	totalStart := time.Now()
+	const maxLoop = 3
 
-	// 1단계: 검색 쿼리 생성
-	fmt.Println("\n[1/4] 검색 쿼리 생성 중...")
+	fmt.Println("\n🤖 Agent 리서치 시작")
+	fmt.Printf("주제: %s\n", topic)
+
+	// 1단계: Plan 수립
+	fmt.Println("\n[1단계] 리서치 계획 수립 중...")
 	step1Start := time.Now()
-	queries, err := a.generateQueries(ctx, topic)
+	researchPlan, err := a.plan(ctx, topic)
 	step1Time := time.Since(step1Start)
-
 	if err != nil {
-		return nil, fmt.Errorf("쿼리 생성 실패: %w", err)
+		return nil, fmt.Errorf("계획 수립 실패: %w", err)
 	}
 
-	// 2단계: 병렬 웹 검색
-	fmt.Printf("\n[2/4] 병렬 웹 검색 중 (%d개 Goroutine)...\n", a.cfg.MaxWorkers)
+	// Plan 출력
+	for i, step := range researchPlan.Steps {
+		fmt.Printf("  %d. [%s] %s\n", i+1, step.Tool, step.Purpose)
+		for _, q := range step.Queries {
+			fmt.Printf("     - %s\n", q)
+		}
+	}
+	fmt.Printf("  목표: 출처 %d개↑ · 품질 %.1f↑", researchPlan.Goal.MinSources, researchPlan.Goal.MinScore)
+	if researchPlan.Goal.NeedStats   { fmt.Print(" · 수치 필요") }
+	if researchPlan.Goal.NeedPapers  { fmt.Print(" · 논문 필요") }
+	if researchPlan.Goal.NeedRecent  { fmt.Print(" · 최신 자료 필요") }
+	fmt.Println()
+	
+	// 2단계: 첫 번째 Tool 실행
+	fmt.Println("\n[2단계] 초기 검색...")
 	step2Start := time.Now()
-	results, err := a.orch.RunParallel(ctx, queries)
+
+	var allResults []tools.SearchResult
+	var usedTools []string
+	totalQueries := 0
+
+	if len(researchPlan.Steps) > 0 {
+		firstStep := researchPlan.Steps[0]
+		firstAction := models.AgentAction{
+			Action:  firstStep.Tool,
+			Queries: firstStep.Queries,
+			Reason:  firstStep.Purpose,
+		}
+
+		totalQueries += len(firstAction.Queries)
+		results, err := a.execute(ctx, firstAction)
+		if err != nil {
+			fmt.Printf("  ⚠ 초기 검색 실패: %v\n", err)
+		} else {
+			allResults = append(allResults, results...)
+			usedTools = append(usedTools, firstStep.Tool)
+		}
+	}
 	step2Time := time.Since(step2Start)
 
-	if err != nil {
-		return nil, fmt.Errorf("웹 검색 실패: %w", err)
+	// 필터링 + 중복 제거
+	filtered, blocked, lowScore := a.filterResults(allResults)
+	filtered = deduplicateResults(filtered)
+	fmt.Printf("  → 전체 %d개 중 유효 %d개 (차단: %d, 저품질: %d)\n",
+		len(allResults), len(filtered), blocked, lowScore)
+
+	// 3단계: Agent Loop
+	fmt.Println("\n[3단계] Agent Loop...")
+	fmt.Println(strings.Repeat("─", 50))
+	loopStart := time.Now()
+
+	for loop := 1; loop <= maxLoop; loop++ {
+		// 현재 상태 평가
+		eval := evaluate(filtered, researchPlan.Goal)
+
+		fmt.Printf("\n  🔄 Loop %d/3\n", loop)
+		fmt.Printf("     출처: %d개 | 품질: %.2f | 최신: %d개 | 수치: %v | 논문: %v\n",
+			eval.SourceCount, eval.AvgScore,
+			eval.RecentCount, eval.HasStats, eval.HasPapers)
+
+		if len(eval.Missing) > 0 {
+			fmt.Printf("     부족: %s\n", strings.Join(eval.Missing, ", "))
+		}
+
+		// 다음 행동 결정
+		action, err := a.decide(ctx, topic, eval, researchPlan.Goal, usedTools, loop)
+		if err != nil {
+			fmt.Printf("  ⚠ 판단 실패: %v\n", err)
+			break
+		}
+
+		fmt.Printf("     → [%s] %s\n", action.Action, action.Reason)
+
+		if action.Action == "finish" {
+			fmt.Println("     ✅ 완료")
+			break
+		}
+
+		// Tool 실행
+		totalQueries += len(action.Queries)
+		newResults, err := a.execute(ctx, action)
+		if err != nil {
+			fmt.Printf("     ⚠ 실패: %v\n", err)
+			continue
+		}
+
+		// 필터링 + 중복 제거 후 추가
+		newFiltered, _, _ := a.filterResults(newResults)
+		newFiltered = deduplicateResults(append(filtered, newFiltered...))
+		added := len(newFiltered) - len(filtered)
+		filtered = newFiltered
+		usedTools = append(usedTools, action.Action)
+
+		fmt.Printf("     → %d개 추가 (총 %d개)\n", added, len(filtered))
 	}
 
-	// 2-1단계: 신뢰도 낮은 출처 필터링
-	filteredResults, blockedCount, lowScoreCount := a.filterResults(results)
-	fmt.Printf("  → 전체 %d개 중 신뢰 결과 %d개 사용\n", len(results), len(filteredResults))
-	fmt.Printf("    차단 도메인: %d개 / Score 미달(%.1f 미만): %d개\n", blockedCount, a.cfg.MinScore, lowScoreCount)
-		
-	// 2-2단계: 검색 품질 평가
-	avgScore, maxScore, minScore := calcQualityStats(filteredResults)
-	fmt.Printf("  → 검색 품질 점수: 평균 %.2f / 최고 %.2f / 최저 %.2f\n", avgScore, maxScore, minScore)
+	loopTime := time.Since(loopStart)
+	fmt.Println(strings.Repeat("─", 50))
+	fmt.Printf("  완료 (%.1fs) | 최종 출처: %d개 | 사용 Tool: %s\n",
+		loopTime.Seconds(), len(filtered), strings.Join(usedTools, " → "))
+
+	// 품질 저장
+	avgScore, maxScore, minScore := calcQualityStats(filtered)
+	fmt.Printf("  품질: 평균 %.2f / 최고 %.2f / 최저 %.2f\n",
+		avgScore, maxScore, minScore)
 	a.saveQuality(topic, avgScore, maxScore, minScore)
 
-	// 3단계: 리포트 작성
-	fmt.Println("\n[3/4] 리포트 작성 중...")
+	// 4단계: 리포트 작성
+	fmt.Println("\n[4단계] 리포트 작성 중...")
 	step3Start := time.Now()
-	markdown, err := a.generateReport(ctx, topic, filteredResults)
+	markdown, err := a.generateReport(ctx, topic, filtered)
 	step3Time := time.Since(step3Start)
-
 	if err != nil {
 		return nil, fmt.Errorf("리포트 생성 실패: %w", err)
 	}
 
-	// 4단계: 카드뉴스 데이터 추출
-	fmt.Println("\n[4/4] 카드뉴스 데이터 추출 중...")
+	// 5단계: 카드뉴스 추출
+	fmt.Println("\n[5단계] 카드뉴스 데이터 추출 중...")
 	step4Start := time.Now()
 	cards, err := a.extractCards(ctx, markdown)
 	step4Time := time.Since(step4Start)
-
 	if err != nil {
-		fmt.Printf("  ⚠ 카드 추출 실패 (리포트는 정상): %v\n", err)
+		fmt.Printf("  ⚠ 카드 추출 실패: %v\n", err)
 	}
 
-	// Breakdown 출력
-	a.printBreakdown(step1Time, step2Time, step3Time, step4Time,
-		time.Since(totalStart), avgScore)
-
-	// 출처 URL 수집 (중복 제거)
-	var sources []string
-	seen := map[string]bool{}
-	for _, r := range filteredResults {
-		if !seen[r.URL] {
-			sources = append(sources, r.URL)
-			seen[r.URL] = true
-		}
-	}
+	// Breakdown
+	a.printBreakdown(step1Time, step2Time, loopTime, step3Time, step4Time,
+		time.Since(totalStart), avgScore, totalQueries, usedTools)
 
 	return &models.Report{
 		Topic:    topic,
 		Markdown: markdown,
 		Cards:    cards,
-		Sources:  collectSources(filteredResults),
+		Sources:  collectSources(filtered),
 	}, nil
 }
 
@@ -154,22 +234,7 @@ func (a *Agent) filterResults(results []tools.SearchResult) (filtered []tools.Se
 		filtered = append(filtered, r)
 	}
 
-	// 결과 부족 시 Score 기준 완화 (차단 도메인은 유지)
-	if len(filtered) < 5 {
-		fmt.Printf("  ⚠ 결과 부족 → Score 기준 %.1f로 완화\n", a.cfg.FallbackScore)
-		filtered = nil
-		for _, r := range results {
-			if a.isBlockedDomain(r.URL) {
-				continue
-			}
-			if r.Score >= a.cfg.FallbackScore {
-				filtered = append(filtered, r)
-			}
-		}
-		fmt.Printf("  → 완화 후 %d개 사용\n", len(filtered))
-	}
-
-	return
+	return filtered, blockedCount, lowScoreCount
 }
 
 // saveQuality — 검색 품질 저장
@@ -188,20 +253,24 @@ func (a *Agent) saveQuality(topic string, avgScore, maxScore, minScore float64) 
 }
 
 // printBreakdown — 소요 시간 출력
-func (a *Agent) printBreakdown(s1, s2, s3, s4, total time.Duration, avgScore float64) {
+func (a *Agent) printBreakdown(s1, s2, s3, s4, s5, total time.Duration, avgScore float64, queryCount int, usedTools []string,) {
 	fmt.Println()
-	fmt.Println(strings.Repeat("─", 45))
-	fmt.Println("⏱ 소요 시간 Breakdown")
-	fmt.Println(strings.Repeat("─", 45))
-	fmt.Printf("  [1/4] 쿼리 생성:   %5.1fs  (Gemini API)\n", s1.Seconds())
-	fmt.Printf("  [2/4] 병렬 검색:   %5.1fs  (Tavily × %d 병렬)\n",
-		s2.Seconds(), a.cfg.MaxWorkers)
-	fmt.Printf("  [3/4] 리포트 작성: %5.1fs  (Gemini API)\n", s3.Seconds())
-	fmt.Printf("  [4/4] 카드 추출:   %5.1fs  (Gemini API)\n", s4.Seconds())
-	fmt.Println(strings.Repeat("─", 45))
-	fmt.Printf("  총 소요 시간:      %5.1fs\n", total.Seconds())
-	fmt.Printf("  검색 품질 점수:    %.2f / 1.0\n", avgScore)
-	fmt.Println(strings.Repeat("─", 45))
+    fmt.Println(strings.Repeat("─", 50))
+    fmt.Println("⏱ 소요 시간 Breakdown")
+    fmt.Println(strings.Repeat("─", 50))
+
+    fmt.Printf("  [1/5] 계획 수립:   %5.1fs  (Gemini API)\n", s1.Seconds())
+    fmt.Printf("  [2/5] 초기 검색:   %5.1fs\n", s2.Seconds())
+    fmt.Printf("  [3/5] Agent Loop:  %5.1fs  (추가 검색)\n", s3.Seconds())
+    fmt.Printf("  [4/5] 리포트 작성: %5.1fs  (Gemini API)\n", s4.Seconds())
+    fmt.Printf("  [5/5] 카드 추출:   %5.1fs  (Gemini API)\n", s5.Seconds())
+
+    fmt.Println(strings.Repeat("─", 50))
+    fmt.Printf("  전체 검색 쿼리:   %d개\n", queryCount)
+    fmt.Printf("  사용 Tool:        %s\n", strings.Join(usedTools, " → "))
+    fmt.Printf("  총 소요 시간:     %5.1fs\n", total.Seconds())
+    fmt.Printf("  검색 품질 점수:   %.2f / 1.0\n", avgScore)
+    fmt.Println(strings.Repeat("─", 50))
 }
 
 // collectSources — 출처 URL 수집 (중복 제거)
